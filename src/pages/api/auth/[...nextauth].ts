@@ -7,7 +7,7 @@ import AzureADProvider from 'next-auth/providers/azure-ad';
 const env = process.env;
 
 
-export async function refreshAccessToken(token: JWT) { 
+async function refreshAccessToken(token: JWT) { 
   try {
     const url = `https://login.microsoftonline.com/${env.NEXT_PUBLIC_AZURE_AD_TENANT_ID}/oauth2/v2.0/token`;
 
@@ -93,5 +93,18 @@ export const authOptions: NextAuthOptions = {
 };
 
 export default nextAuth(authOptions)
+
+declare module "next-auth" {
+  interface Session {
+    error?: "RefreshAccessTokenError"
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string,
+    accessTokenExpires: number,
+  }
+}
 
 
