@@ -1,9 +1,13 @@
-import NextAuth from 'next-auth';
+import { Account } from 'next-auth';
+import { NextAuthOptions, User} from 'next-auth';
+import { AdapterUser } from 'next-auth/adapters';
+import { JWT } from 'next-auth/jwt';
 import AzureADProvider from 'next-auth/providers/azure-ad';
 
 const env = process.env;
 
-async function refreshAccessToken(token) {
+
+export async function refreshAccessToken(token: JWT) { 
   try {
     const url = `https://login.microsoftonline.com/${env.NEXT_PUBLIC_AZURE_AD_TENANT_ID}/oauth2/v2.0/token`;
 
@@ -15,7 +19,7 @@ async function refreshAccessToken(token) {
         'azure-ad-client-secret',
       scope: 'email openid profile User.Read offline_access',
       grant_type: 'refresh_token',
-      refresh_token: token.refreshToken,
+      refresh_token: token.refreshToken as string,
     });
 
     const response = await fetch(url, {
@@ -27,15 +31,16 @@ async function refreshAccessToken(token) {
     });
 
     const refreshedTokens = await response.json();
+
     if (!response.ok) {
       throw refreshedTokens;
     }
 
     return {
       ...token,
-      accessToken: refreshedTokens.id_token,
-      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
-      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+      accessToken: refreshedTokens.id_token as string,
+      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000 as number,
+      refreshToken: refreshedTokens.refresh_token as string,
     };
   } catch (error) {
     return {
@@ -45,7 +50,8 @@ async function refreshAccessToken(token) {
   }
 }
 
-export const authOptions = {
+
+export const authOptions: NextAuthOptions = {
   providers: [
     AzureADProvider({
       clientId: `${env.NEXT_PUBLIC_AZURE_AD_CLIENT_ID}`,
@@ -58,35 +64,30 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
-      // Persist the id_token, expires_at &refresh_token to the token right after signin
-      if (account && user) {
-        return {
-          accessToken: account.id_token,
-          accessTokenExpires: account?.expires_at
-            ? account.expires_at * 1000
-            : 0,
-          refreshToken: account.refresh_token,
-          user,
-        };
-      }
-
-      if (Date.now() < token.accessTokenExpires - 100000 || 0) {
-        return token;
-      }
-
+   jwt: async ({ user, token, account }:{user?: User| AdapterUser | undefined, token:JWT, account:  Account | null})=>{
+    
+    if(account && user){
+      //Initial login check
+     return {
+      accessToken: account.id_token,
+      accessTokenExpires: account?.expires_at
+        ? account.expires_at * 1000
+        : 0,
+      refreshToken: account.refresh_token,
+      user,
+     }
+     }if(Date.now() > token.accessTokenExpires ){
+      // Refresh token when expire (every 1hrs)
       return refreshAccessToken(token);
-    },
-    async session({ session, token }) {
-      if (session) {
-        session.user = token.user;
-        session.error = token.error;
-        session.accessToken = token.accessToken;
-      }
-      return session;
-    },
+   } else {
+      return token;
+   } 
+     },
+   session: async({ session, token }) =>{
+    return {
+      ...session,
+      ...token
+    }
+   }
   },
 };
-export default NextAuth(authOptions);
-
-// return refreshAccessToken(token);
