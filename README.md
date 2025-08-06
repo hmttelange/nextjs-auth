@@ -19,7 +19,7 @@ You can start editing the page by modifying `pages/index.js`. The page auto-upda
 
 ## Output
 
-https://user-images.githubusercontent.com/96057435/235067443-04503b59-4996-4245-87fa-5dcb40b970aa.mp4
+Need to add video
 
 ## Learn More
 
